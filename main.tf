@@ -24,14 +24,6 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config.0.cluster_ca_certificate)
 }
 
-resource "kubernetes_service_account" "counting" {
-  provider = kubernetes.aks
-
-  metadata {
-    name = "counting"
-  }
-}
-
 resource "kubernetes_pod" "counting" {
   provider = kubernetes.aks
 
@@ -40,7 +32,6 @@ resource "kubernetes_pod" "counting" {
   }
 
   spec {
-    service_account_name = "counting"
     container {
       image = "hashicorp/counting-service:0.0.2"
       name  = "counting"
@@ -52,7 +43,6 @@ resource "kubernetes_pod" "counting" {
     }
   }
 
-  depends_on = [kubernetes_service_account.counting]
 }
 
 ## EKS resources 
@@ -83,14 +73,6 @@ provider "kubernetes" {
   }
 }
 
-resource "kubernetes_service_account" "dashboard" {
-  provider = kubernetes.eks
-
-  metadata {
-    name = "dashboard"
-  }
-}
-
 resource "kubernetes_pod" "dashboard" {
   provider = kubernetes.eks
 
@@ -105,7 +87,6 @@ resource "kubernetes_pod" "dashboard" {
   }
 
   spec {
-    service_account_name = "dashboard"
     container {
       image = "hashicorp/dashboard-service:0.0.4"
       name  = "dashboard"
@@ -121,8 +102,6 @@ resource "kubernetes_pod" "dashboard" {
       }
     }
   }
-
-  depends_on = [kubernetes_service_account.dashboard]
 }
 
 resource "kubernetes_service" "dashboard" {
