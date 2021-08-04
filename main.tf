@@ -14,8 +14,8 @@ provider "azurerm" {
 data "azurerm_kubernetes_cluster" "cluster" {
   name                = data.terraform_remote_state.aks.outputs.kubernetes_cluster_name
   resource_group_name = data.terraform_remote_state.aks.outputs.resource_group_name
-}
 
+}
 provider "kubernetes" {
   alias                  = "aks"
   host                   = data.azurerm_kubernetes_cluster.cluster.kube_config.0.host
@@ -24,28 +24,65 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config.0.cluster_ca_certificate)
 }
 
-resource "kubernetes_pod" "counting" {
+resource "kubernetes_deployment" "counting" {
   provider = kubernetes.aks
-
   metadata {
     name = "counting"
   }
 
   spec {
-    container {
-      image = "hashicorp/counting-service:0.0.2"
-      name  = "counting"
-
-      port {
-        container_port = 9001
-        name           = "http"
+    replicas = 1
+    selector {
+      match_labels = {
+        service = "counting"
+        app     = "counting"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          service = "counting"
+          app     = "counting"
+        }
+      }
+      spec {
+        container {
+          image = "hashicorp/counting-service:0.0.2"
+          name  = "counting"
+          port {
+            container_port = 9001
+            name           = "http"
+          }
+        }
       }
     }
   }
-
 }
 
-## EKS resources 
+resource "kubernetes_service" "counting" {
+  provider = kubernetes.aks
+  metadata {
+    name      = "counting"
+    namespace = "default"
+    labels = {
+      "app" = "counting"
+    }
+  }
+  spec {
+    selector = {
+      "app" = "counting"
+    }
+    port {
+      name        = "http"
+      port        = 9001
+      target_port = 9001
+      protocol    = "TCP"
+    }
+    type = "ClusterIP"
+  }
+}
+
+# EKS resources 
 
 data "terraform_remote_state" "eks" {
   backend = "local"
@@ -73,9 +110,8 @@ provider "kubernetes" {
   }
 }
 
-resource "kubernetes_pod" "dashboard" {
+resource "kubernetes_deployment" "dashboard" {
   provider = kubernetes.eks
-
   metadata {
     name = "dashboard"
     annotations = {
@@ -87,18 +123,35 @@ resource "kubernetes_pod" "dashboard" {
   }
 
   spec {
-    container {
-      image = "hashicorp/dashboard-service:0.0.4"
-      name  = "dashboard"
-
-      env {
-        name  = "COUNTING_SERVICE_URL"
-        value = "http://localhost:9001"
+    replicas = 1
+    selector {
+      match_labels = {
+        service = "dashboard"
+        app     = "dashboard"
       }
+    }
+    template {
+      metadata {
+        labels = {
+          service = "dashboard"
+          app     = "dashboard"
+        }
+      }
+      spec {
+        container {
+          image = "hashicorp/dashboard-service:0.0.4"
+          name  = "dashboard"
 
-      port {
-        container_port = 9002
-        name           = "http"
+          env {
+            name  = "COUNTING_SERVICE_URL"
+            value = "http://localhost:9001"
+          }
+
+          port {
+            container_port = 9002
+            name           = "http"
+          }
+        }
       }
     }
   }
