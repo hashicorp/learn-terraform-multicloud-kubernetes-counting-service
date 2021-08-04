@@ -15,7 +15,6 @@ data "azurerm_kubernetes_cluster" "cluster" {
   name                = data.terraform_remote_state.aks.outputs.kubernetes_cluster_name
   resource_group_name = data.terraform_remote_state.aks.outputs.resource_group_name
 }
-
 provider "kubernetes" {
   alias                  = "aks"
   host                   = data.azurerm_kubernetes_cluster.cluster.kube_config.0.host
@@ -29,6 +28,9 @@ resource "kubernetes_pod" "counting" {
 
   metadata {
     name = "counting"
+    labels = {
+      "app" = "counting"
+    }
   }
 
   spec {
@@ -42,10 +44,32 @@ resource "kubernetes_pod" "counting" {
       }
     }
   }
-
 }
 
-## EKS resources 
+resource "kubernetes_service" "counting" {
+  provider = kubernetes.aks
+  metadata {
+    name      = "counting"
+    namespace = "default"
+    labels = {
+      "app" = "counting"
+    }
+  }
+  spec {
+    selector = {
+      "app" = "counting"
+    }
+    port {
+      name        = "http"
+      port        = 9001
+      target_port = 9001
+      protocol    = "TCP"
+    }
+    type = "ClusterIP"
+  }
+}
+
+# EKS resources 
 
 data "terraform_remote_state" "eks" {
   backend = "local"
