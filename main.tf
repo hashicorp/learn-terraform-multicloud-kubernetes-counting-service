@@ -14,7 +14,6 @@ provider "azurerm" {
 data "azurerm_kubernetes_cluster" "cluster" {
   name                = data.terraform_remote_state.aks.outputs.kubernetes_cluster_name
   resource_group_name = data.terraform_remote_state.aks.outputs.resource_group_name
-
 }
 provider "kubernetes" {
   alias                  = "aks"
@@ -24,36 +23,24 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(data.azurerm_kubernetes_cluster.cluster.kube_config.0.cluster_ca_certificate)
 }
 
-resource "kubernetes_deployment" "counting" {
+resource "kubernetes_pod" "counting" {
   provider = kubernetes.aks
+
   metadata {
     name = "counting"
+    labels = {
+      "app" = "counting"
+    }
   }
 
   spec {
-    replicas = 1
-    selector {
-      match_labels = {
-        service = "counting"
-        app     = "counting"
-      }
-    }
-    template {
-      metadata {
-        labels = {
-          service = "counting"
-          app     = "counting"
-        }
-      }
-      spec {
-        container {
-          image = "hashicorp/counting-service:0.0.2"
-          name  = "counting"
-          port {
-            container_port = 9001
-            name           = "http"
-          }
-        }
+    container {
+      image = "hashicorp/counting-service:0.0.2"
+      name  = "counting"
+
+      port {
+        container_port = 9001
+        name           = "http"
       }
     }
   }
@@ -110,8 +97,9 @@ provider "kubernetes" {
   }
 }
 
-resource "kubernetes_deployment" "dashboard" {
+resource "kubernetes_pod" "dashboard" {
   provider = kubernetes.eks
+
   metadata {
     name = "dashboard"
     annotations = {
@@ -123,35 +111,18 @@ resource "kubernetes_deployment" "dashboard" {
   }
 
   spec {
-    replicas = 1
-    selector {
-      match_labels = {
-        service = "dashboard"
-        app     = "dashboard"
-      }
-    }
-    template {
-      metadata {
-        labels = {
-          service = "dashboard"
-          app     = "dashboard"
-        }
-      }
-      spec {
-        container {
-          image = "hashicorp/dashboard-service:0.0.4"
-          name  = "dashboard"
+    container {
+      image = "hashicorp/dashboard-service:0.0.4"
+      name  = "dashboard"
 
-          env {
-            name  = "COUNTING_SERVICE_URL"
-            value = "http://localhost:9001"
-          }
+      env {
+        name  = "COUNTING_SERVICE_URL"
+        value = "http://localhost:9001"
+      }
 
-          port {
-            container_port = 9002
-            name           = "http"
-          }
-        }
+      port {
+        container_port = 9002
+        name           = "http"
       }
     }
   }
